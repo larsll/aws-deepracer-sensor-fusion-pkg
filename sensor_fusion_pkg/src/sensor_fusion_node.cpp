@@ -56,6 +56,7 @@ The node defines:
 
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include "sensor_msgs/msg/image.hpp"
+#include "sensor_msgs/msg/imu.hpp"
 #include "cv_bridge/cv_bridge.h"
 #include "opencv2/opencv.hpp"
 
@@ -119,6 +120,7 @@ namespace SensorFusion {
     const char* CAMERA_MSG_TOPIC = "/camera_pkg/video_mjpeg";
     const char* DISPLAY_MSG_TOPIC = "/camera_pkg/display_mjpeg";
     const char* LIDAR_MSG_TOPIC = "/rplidar_ros/scan";
+    const char* IMU_MSG_TOPIC = "/imu_pkg/imu_raw";
 
     // Sensor configuration file path.
     const char* SENSOR_CONFIGURATION_FILE_PATH = "/opt/aws/deepracer/sensor_configuration.json";
@@ -219,8 +221,15 @@ namespace SensorFusion {
                                                                                        this,
                                                                                        std::placeholders::_1));
 
+            // Subscriber to subscribe to the IMU message published by the imu_pkg.
+            imuSub_ = this->create_subscription<sensor_msgs::msg::Imu>(IMU_MSG_TOPIC,
+                                                                             sensorMsgQOS,
+                                                                             std::bind(&SensorFusionNode::imuCB,
+                                                                                       this,
+                                                                                       std::placeholders::_1));
 
             cameraImageCount_ = 0;
+            imuData_ = std::make_shared<sensor_msgs::msg::Imu>();
         }
         ~SensorFusionNode() = default;
     private:
@@ -267,6 +276,7 @@ namespace SensorFusion {
                     // Set LiDAR data by default
                     sensorMsg.lidar_data = lidarData_; 
                 }
+                sensorMsg.imu_data = *imuData_;
                 this->sensorMsgPub_->publish(sensorMsg);  // Publish it along.
             }
             catch (const std::exception &ex) {
@@ -356,6 +366,19 @@ namespace SensorFusion {
                 RCLCPP_ERROR(this->get_logger(), "LiDAR callback failed: %s", ex.what());
             }
         }
+
+        /// Callback function for IMU message subscription.
+        /// @param msg Message with raw data from IMU.
+        void imuCB(const sensor_msgs::msg::Imu::SharedPtr msg) {
+            try {
+                imuData_ = msg;
+                RCLCPP_INFO(this->get_logger(), "Got IMU Data! %f", msg->linear_acceleration.z);
+            }
+            catch (const std::exception &ex) {
+                RCLCPP_ERROR(this->get_logger(), "IMU callback failed: %s", ex.what());
+            }
+        }
+
 
         /// Function to sectorize the lidarData to represent sectors where an object is detected.
         std::vector<float> binarySectorizeLidarData(const std::vector<float>& lidarData, size_t blockSize, float maxDist){
@@ -534,6 +557,7 @@ namespace SensorFusion {
         rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr lidarSub_;
         rclcpp::Subscription<deepracer_interfaces_pkg::msg::CameraMsg>::SharedPtr cameraSub_;
         rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr displaySub_;
+        rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imuSub_;
 
         rclcpp::Service<deepracer_interfaces_pkg::srv::LidarConfigSrv>::SharedPtr lidarConfigService_;
         rclcpp::Service<deepracer_interfaces_pkg::srv::SensorStatusCheckSrv>::SharedPtr statusCheckService_;
@@ -557,6 +581,7 @@ namespace SensorFusion {
         int imageWidth_;
         int imageHeight_;
         std::mutex lidarMutex_;
+        sensor_msgs::msg::Imu::SharedPtr imuData_;
     };
 }
 
