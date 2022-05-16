@@ -72,8 +72,8 @@ The node defines:
 #define RAD2DEG(x) ((x)*180./M_PI)
 
 namespace SensorFusion {
-    #define DEFAULT_IMAGE_WIDTH 160
-    #define DEFAULT_IMAGE_HEIGHT 120
+    #define DEFAULT_IMAGE_WIDTH 320
+    #define DEFAULT_IMAGE_HEIGHT 240
 
     // Default lidar configuration
     #define DEFAULT_LIDAR_CONFIGURATION_MIN_LIDAR_ANGLE -60.0
@@ -201,32 +201,53 @@ namespace SensorFusion {
                                                                                          
             auto sensorMsgQOS = rclcpp::QoS(rclcpp::KeepLast(1));
             sensorMsgQOS.best_effort();
+
+            lidarSubCallbackGroup_ = this->create_callback_group(
+                rclcpp::CallbackGroupType::MutuallyExclusive);
+            cameraSubCallbackGroup_ = this->create_callback_group(
+                rclcpp::CallbackGroupType::MutuallyExclusive);
+            displaySubCallbackGroup_ = this->create_callback_group(
+                rclcpp::CallbackGroupType::MutuallyExclusive);
+            imuSubCallbackGroup_ = this->create_callback_group(
+                rclcpp::CallbackGroupType::MutuallyExclusive);
+
             // Subscriber to subscribe to the lidar scan messages published by the LiDAR.
+            auto lidarSubOpt = rclcpp::SubscriptionOptions();
+            lidarSubOpt.callback_group = lidarSubCallbackGroup_;            
             lidarSub_ = this->create_subscription<sensor_msgs::msg::LaserScan>(LIDAR_MSG_TOPIC,
                                                                                sensorMsgQOS,
                                                                                std::bind(&SensorFusionNode::lidarCB,
                                                                                          this,
-                                                                                         std::placeholders::_1));
+                                                                                         std::placeholders::_1),
+                                                                               lidarSubOpt);
             // Subscriber to subscribe to the camera sensor messages published by the camera_pkg.
+            auto cameraSubOpt = rclcpp::SubscriptionOptions();
+            cameraSubOpt.callback_group = cameraSubCallbackGroup_;                 
             cameraSub_ = this->create_subscription<deepracer_interfaces_pkg::msg::CameraMsg>(CAMERA_MSG_TOPIC,
                                                                                              sensorMsgQOS,
                                                                                              std::bind(&SensorFusionNode::cameraCB,
                                                                                                        this,
-                                                                                                       std::placeholders::_1));
-
+                                                                                                       std::placeholders::_1),
+                                                                                             cameraSubOpt);
             // Subscriber to subscribe to the camera display messages published by the camera_pkg.
+            auto displaySubOpt = rclcpp::SubscriptionOptions();
+            displaySubOpt.callback_group = displaySubCallbackGroup_;    
             displaySub_ = this->create_subscription<sensor_msgs::msg::Image>(DISPLAY_MSG_TOPIC,
                                                                              sensorMsgQOS,
                                                                              std::bind(&SensorFusionNode::displayCB,
                                                                                        this,
-                                                                                       std::placeholders::_1));
+                                                                                       std::placeholders::_1),
+                                                                             displaySubOpt);
 
             // Subscriber to subscribe to the IMU message published by the imu_pkg.
+            auto imuSubOpt = rclcpp::SubscriptionOptions();
+            imuSubOpt.callback_group = imuSubCallbackGroup_;            
             imuSub_ = this->create_subscription<sensor_msgs::msg::Imu>(IMU_MSG_TOPIC,
                                                                              sensorMsgQOS,
                                                                              std::bind(&SensorFusionNode::imuCB,
                                                                                        this,
-                                                                                       std::placeholders::_1));
+                                                                                       std::placeholders::_1),
+                                                                             imuSubOpt);
 
             cameraImageCount_ = 0;
             imuData_ = std::make_shared<sensor_msgs::msg::Imu>();
@@ -372,7 +393,6 @@ namespace SensorFusion {
         void imuCB(const sensor_msgs::msg::Imu::SharedPtr msg) {
             try {
                 imuData_ = msg;
-                RCLCPP_INFO(this->get_logger(), "Got IMU Data! %f", msg->linear_acceleration.z);
             }
             catch (const std::exception &ex) {
                 RCLCPP_ERROR(this->get_logger(), "IMU callback failed: %s", ex.what());
@@ -553,6 +573,11 @@ namespace SensorFusion {
 
         }
         
+
+        rclcpp::CallbackGroup::SharedPtr lidarSubCallbackGroup_;
+        rclcpp::CallbackGroup::SharedPtr cameraSubCallbackGroup_;
+        rclcpp::CallbackGroup::SharedPtr displaySubCallbackGroup_;
+        rclcpp::CallbackGroup::SharedPtr imuSubCallbackGroup_;
 
         rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr lidarSub_;
         rclcpp::Subscription<deepracer_interfaces_pkg::msg::CameraMsg>::SharedPtr cameraSub_;
