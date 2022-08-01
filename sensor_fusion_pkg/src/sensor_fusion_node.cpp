@@ -120,7 +120,7 @@ namespace SensorFusion {
     const char* CAMERA_MSG_TOPIC = "/camera_pkg/video_mjpeg";
     const char* DISPLAY_MSG_TOPIC = "/camera_pkg/display_mjpeg";
     const char* LIDAR_MSG_TOPIC = "/rplidar_ros/scan";
-    const char* IMU_MSG_TOPIC = "/imu_pkg/imu_raw";
+    const char* IMU_MSG_TOPIC = "/imu/data";
 
     // Sensor configuration file path.
     const char* SENSOR_CONFIGURATION_FILE_PATH = "/opt/aws/deepracer/sensor_configuration.json";
